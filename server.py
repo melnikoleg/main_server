@@ -48,8 +48,8 @@ def render_and_vect(path, id_part):
         # os.remove(path)
         import vectorize
 
-        id_vec = vectorize.vectorize_add(dir_name="F:/PROG/tmp46/",id_part=id_part)
-
+        #id_vec = vectorize.vectorize_add(dir_name="F:/PROG/tmp46/",id_part=id_part)
+        id_vec = vectorize.vectorize_add(dir_name="temp/",id_part=id_part)
         return id_vec
 
     except Exception as e:
@@ -143,11 +143,11 @@ def add_part():
 
         return None
 
-    def save_to_disk(file_model, model_id):
+    def save_to_disk(file_model, model_id, part_id):
         if file_model and allowed_file(file_model.filename):
             # filename = secure_filename(file.filename)
             # file.save(os.path.join('models', model_id+str('.stl')))
-            path = os.path.join('models', str(model_id) + '.stl')
+            path = os.path.join('models', str(part_id) + '.stl')
             with open(path, 'wb') as file:
                 fss.download_to_stream(ObjectId(str(model_id)), file)
 
@@ -176,8 +176,11 @@ def add_part():
                           'draw_id_img_preview': str(draw_id_img_preview),
                           })
 
-    path_to_model = save_to_disk(file_model, str(id_doc))
+    path_to_model = save_to_disk(file_model, model_id,str(id_doc))
+    print(path_to_model)
+
     id_vec = render_and_vect(path_to_model, id_doc)
+
     coll.update({"_id" :ObjectId(id_doc) },{"$set" : {"id_vec":id_vec}})
 
     return "OK"

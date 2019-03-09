@@ -28,8 +28,8 @@ def vectorize_add(dir_name,id_part):
     model = MobileNetV2(input_shape=(224, 224, 3), include_top=False, pooling='avg')
 
     vec_arr =[]
-
-    for top, dirs, files in os.walk(os.path.join(dir_name,id_part)):
+    print(os.path.join(dir_name,str(id_part)))
+    for top, dirs, files in os.walk(os.path.join(dir_name,str(id_part))):
         for nm in files:
             img = image.load_img(os.path.join(top, nm), target_size=(224, 224))
             x = image.img_to_array(img)
