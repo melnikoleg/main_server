@@ -141,7 +141,7 @@ def normalize_model(name):
     print('original dim:' + str(dim))
     if max(dim) > 0:
         dim = dim / max(dim)
-    obj.dimensions = dim*3
+    obj.dimensions = dim * 3.5
 
     print('new dim:' + str(dim))
 

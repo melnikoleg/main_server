@@ -11,7 +11,7 @@ from bson.json_util import dumps
 from bson.objectid import ObjectId
 from flask import jsonify
 import threading
-
+from predict import load_predictor
 from werkzeug.utils import secure_filename
 
 UPLOAD_FOLDER = ''
@@ -57,55 +57,38 @@ def render_and_vect(path, id_part):
 
 
 
-@thread
-@app.route('/image', methods=['POST'])
-def recognize():
-    try:
-        data = request.json
-
-        from predict import load_predictor
-        num_data = np.array(data)
-        #new_data = num_data + num_data
-        # 2.183826
-        #print(new_data)
-        result = load_predictor(data)
-        print(str(result))
-
-        doc = coll.find_one(result)
-        print(doc)
-
-        return 'ok'
-
-    except Exception as e:
-        print(str(e))
-        return dumps({'error': str(e)})
-
 
 @thread
-@app.route('/image_test', methods=['POST'])
+@app.route('/recognise_image', methods=['POST'])
 def test():
     try:
+
         data = request.json
-        # print(data)
+        print(len(data))
 
-        doc = coll.find_one(ObjectId("5c7d5698410d6c147835defe"))
+        # new_data = num_data + num_data
+        # 2.183826
 
-        draw_img_preview = fss.open_download_stream(ObjectId(str(doc['draw_id_img_preview'])))
-        # draw_img = fss.open_download_stream(ObjectId(str(doc['draw_id_img'])))
+        result = load_predictor(data)
+        print(result)
+        json_parts = []
+        for i in result:
+            doc = coll.find_one(ObjectId(i[0]))
+            draw_img_preview = fss.open_download_stream(ObjectId(str(doc['draw_id_img_preview'])))
+            json_part = {
+                'draw_img_preview': draw_img_preview.read(),
+                'draw_img_id': doc['draw_id_img'],
+                'Name': doc['Name'],
+                'Designation': doc['Designation'], }
+            json_parts.append(json_part)
 
-        json_data = {"predict_result": [{
-            'draw_img_preview': draw_img_preview.read(),
-            'draw_img_id': doc['draw_id_img'],
-            'Name': doc['Name'],
-            'Designation': doc['Designation'], }
-        ]}
+        json_data = {"predict_result": json_parts}
 
         print(json_util.dumps(json_data))
         return json_util.dumps(json_data)
 
     except Exception as e:
         print(str(e))
-        return dumps({'error': str(e)})
 
 
 def allowed_file(filename):
