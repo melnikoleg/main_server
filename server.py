@@ -1,18 +1,18 @@
 import glob
 import json
 import os
-import numpy as np
-from bson import json_util
-from flask import Flask, request, redirect, url_for
-from pymongo import MongoClient
 import subprocess
-import gridfs
-from bson.json_util import dumps
-from bson.objectid import ObjectId
-from flask import jsonify
 import threading
+
+import cv2
+import gridfs
+from bson import json_util
+from bson.objectid import ObjectId
+from flask import Flask, request
+from pymongo import MongoClient
+from skimage.measure import compare_ssim
+
 from predict import load_predictor
-from werkzeug.utils import secure_filename
 
 UPLOAD_FOLDER = ''
 
@@ -31,6 +31,25 @@ fs = gridfs.GridFS(db)
 fss = gridfs.GridFSBucket(db)
 
 
+def delete_similar_images(dir_name, id_part):
+    files = glob.glob(os.path.join(dir_name, id_part, "*.jpg"))
+
+    for a_file in files:
+        # print(a_file)
+        imageA = cv2.imread(str(a_file))
+        grayA = cv2.cvtColor(imageA, cv2.COLOR_BGR2GRAY)
+        for b_file in files:
+            if b_file == a_file:
+                continue
+            imageB = cv2.imread(b_file)
+            grayB = cv2.cvtColor(imageB, cv2.COLOR_BGR2GRAY)
+            (score, diff) = compare_ssim(grayA, grayB, full=True)
+            # print(score)
+            if score > 0.7:
+                os.remove(b_file)
+                files.remove(b_file)
+
+
 def thread(func):
     def wrapper(*args, **kwargs):
         my_thread = threading.Thread(target=func, args=args, kwargs=kwargs)
@@ -43,11 +62,12 @@ def render_and_vect(path, id_part):
     try:
 
         subprocess.call(
-            ["C:/Program Files/Blender Foundation/Blender/blender.exe", "phong_2.blend", "--background", "--python",
-             "phong_2.py", "--", path, "F:/PROG/tmp46/"])
+            ["C:/Program Files/Blender Foundation/Blender/blender.exe", "phong_3.blend", "--background", "--python",
+             "phong_2.py", "--", path, "temp/"])
         # os.remove(path)
-        import vectorize
 
+        delete_similar_images(dir_name="temp/", id_part=id_part)
+        import vectorize
         #id_vec = vectorize.vectorize_add(dir_name="F:/PROG/tmp46/",id_part=id_part)
         id_vec = vectorize.vectorize_add(dir_name="temp/",id_part=id_part)
         return id_vec
