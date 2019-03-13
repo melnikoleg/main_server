@@ -35,16 +35,15 @@ def delete_similar_images(dir_name, id_part):
     files = glob.glob(os.path.join(dir_name, id_part, "*.jpg"))
 
     for a_file in files:
-        # print(a_file)
+        print(a_file)
         imageA = cv2.imread(str(a_file))
         grayA = cv2.cvtColor(imageA, cv2.COLOR_BGR2GRAY)
+        files.remove(a_file)
         for b_file in files:
-            if b_file == a_file:
-                continue
             imageB = cv2.imread(b_file)
             grayB = cv2.cvtColor(imageB, cv2.COLOR_BGR2GRAY)
             (score, diff) = compare_ssim(grayA, grayB, full=True)
-            # print(score)
+            print(score)
             if score > 0.7:
                 os.remove(b_file)
                 files.remove(b_file)
