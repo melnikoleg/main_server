@@ -1,38 +1,45 @@
 import glob
 import json
 import os
+import shutil
 import subprocess
 import threading
+import time
 
 import cv2
 import gridfs
+import numpy as np
 from bson import json_util
 from bson.objectid import ObjectId
 from flask import Flask, request
+from keras import backend as K
 from pymongo import MongoClient
 from skimage.measure import compare_ssim
 
-from predict import load_predictor
+import globals as _g
 
-UPLOAD_FOLDER = ''
+K.tensorflow_backend._get_available_gpus()
 
-ALLOWED_EXTENSIONS = {'pdf', 'stl', 'PDF', 'STL', 'jpg'}
-
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+from predict import load_predictor, load_sparse_matrix
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = _g.UPLOAD_FOLDER
 
-conn = MongoClient(host='192.168.1.242', port=27017)
+app = Flask(__name__)
+
+conn = MongoClient(host=_g.HOST, port=27017)
+
 db = conn['Parts']
 coll = db['Part']
 
 fs = gridfs.GridFS(db)
 fss = gridfs.GridFSBucket(db)
 
+VEC = np.zeros(1792)
+
 
 def delete_similar_images(dir_name, id_part):
-    files = glob.glob(os.path.join(dir_name, id_part, "*.jpg"))
+    files = glob.glob(os.path.join(dir_name, str(id_part), "*.jpg"))
 
     for a_file in files:
         print(a_file)
@@ -44,9 +51,17 @@ def delete_similar_images(dir_name, id_part):
             grayB = cv2.cvtColor(imageB, cv2.COLOR_BGR2GRAY)
             (score, diff) = compare_ssim(grayA, grayB, full=True)
             print(score)
-            if score > 0.7:
+            if score > 0.85:
                 os.remove(b_file)
                 files.remove(b_file)
+
+
+def blur_all(dir_name, id_part):
+    files = glob.glob(os.path.join(dir_name, str(id_part), "*.jpg"))
+    for file in files:
+        img = cv2.imread(file)
+        img = cv2.blur(img, (5, 5), 2)
+        cv2.imwrite(file, img)
 
 
 def thread(func):
@@ -57,38 +72,42 @@ def thread(func):
     return wrapper()
 
 
-def render_and_vect(path, id_part):
+def render_and_vect(path_to_model, id_part):
+
     try:
+        start_time = time.time()
 
         subprocess.call(
             ["C:/Program Files/Blender Foundation/Blender/blender.exe", "phong_3.blend", "--background", "--python",
-             "phong_2.py", "--", path, "temp/"])
+             "phong_2.py", "--", path_to_model, "temp/"])
         # os.remove(path)
 
         delete_similar_images(dir_name="temp/", id_part=id_part)
+        os.remove(path_to_model)
+        print("--- %s seconds ---" % (time.time() - start_time))
         import vectorize
-        #id_vec = vectorize.vectorize_add(dir_name="F:/PROG/tmp46/",id_part=id_part)
-        id_vec = vectorize.vectorize_add(dir_name="temp/",id_part=id_part)
+        # id_vec = vectorize.vectorize_add(dir_name="F:/PROG/tmp46/",id_part=id_part)
+        id_vec = vectorize.vectorize_add(dir_name="temp/", id_part=id_part)
+        print("--- %s seconds ---" % (time.time() - start_time))
+        shutil.rmtree(os.path.join("temp/", str(id_part)))
         return id_vec
 
     except Exception as e:
         print(str(e))
 
 
-
-
 @thread
 @app.route('/recognise_image', methods=['POST'])
-def test():
+def recognise_image():
     try:
-
+        start_time = time.time()
         data = request.json
-        print(len(data))
-
-        # new_data = num_data + num_data
+        vec = np.array(data)
+        new_data = vec
+        # new_data = VEC +vec
         # 2.183826
 
-        result = load_predictor(data)
+        result = load_predictor(new_data)
         print(result)
         json_parts = []
         for i in result:
@@ -102,8 +121,8 @@ def test():
             json_parts.append(json_part)
 
         json_data = {"predict_result": json_parts}
-
-        print(json_util.dumps(json_data))
+        print("--- %s seconds ---" % (time.time() - start_time))
+        # print(json_util.dumps(json_data))
         return json_util.dumps(json_data)
 
     except Exception as e:
@@ -112,7 +131,7 @@ def test():
 
 def allowed_file(filename):
     return '.' in filename and \
-           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+           filename.rsplit('.', 1)[1] in _g.ALLOWED_EXTENSIONS
 
 
 @thread
@@ -126,7 +145,7 @@ def fullImage():
         draw_img = fss.open_download_stream(ObjectId(str(data["id"])))
         # data ={"full_image":}
         respond = json_util.dumps(draw_img.read())
-        print(respond)
+        # print(respond)
 
         return respond
 
@@ -136,6 +155,7 @@ def fullImage():
 
 @app.route('/add_part', methods=['POST'])
 def add_part():
+
     def upload_to_gridfs(file):
 
         if file and allowed_file(file.filename):
@@ -178,12 +198,14 @@ def add_part():
                           'draw_id_img_preview': str(draw_id_img_preview),
                           })
 
-    path_to_model = save_to_disk(file_model, model_id,str(id_doc))
+    path_to_model = save_to_disk(file_model, model_id, str(id_doc))
     print(path_to_model)
 
     id_vec = render_and_vect(path_to_model, id_doc)
 
-    coll.update({"_id" :ObjectId(id_doc) },{"$set" : {"id_vec":id_vec}})
+    coll.update({"_id": ObjectId(id_doc)}, {"$set": {"id_vec": id_vec}})
+
+    load_sparse_matrix()
 
     return "OK"
 
@@ -194,6 +216,19 @@ def show_db():
 
     documents = [doc for doc in coll.find()]
     return json_util.dumps({'cursor': documents})
+
+
+@app.route('/delete', methods=['POST'])
+def delete():
+    delete_id = request.json
+    doc = coll.find_one({'_id': ObjectId(delete_id)})
+    fs.delete(doc['3d_model'])
+    fs.delete(doc['Draw_img'])
+    fs.delete(doc['draw_id_img'])
+    fs.delete(doc['draw_id_img_preview'])
+    vec_coll = db['vectors']
+    vec_coll.remove(doc['id_vec'])
+    coll.remove(ObjectId(delete_id))
 
 
 app.run(host='0.0.0.0')

@@ -1,8 +1,9 @@
-import bpy
-import os.path
 import math
+import os.path
 import sys
-import random
+
+import bpy
+
 C = bpy.context
 D = bpy.data
 scene = D.scenes['Scene']
@@ -17,7 +18,7 @@ scene = D.scenes['Scene']
 # 12 orientations around the object with 30-deg elevation
 #cameras = [(60, i) for i in range(0, 360, 30)]
 
-cameras = [(0, 0), (0, 90),  (0, 120), (0, 180),(0, 210), (0, 270)]
+cameras = [(0, 0), (0, 90), (0, 120), (0, 180), (0, 210), (0, 270)]
 render_setting = scene.render
 
 # output image size = (W, H)
@@ -141,7 +142,7 @@ def normalize_model(name):
     print('original dim:' + str(dim))
     if max(dim) > 0:
         dim = dim / max(dim)
-    obj.dimensions = dim * 3.5
+    obj.dimensions = dim * 3.2
 
     print('new dim:' + str(dim))
 
