@@ -83,6 +83,7 @@ def render_and_vect(path_to_model, id_part):
         # os.remove(path)
 
         delete_similar_images(dir_name="temp/", id_part=id_part)
+        blur_all(dir_name="temp/", id_part=id_part)
         os.remove(path_to_model)
         print("--- %s seconds ---" % (time.time() - start_time))
         import vectorize
@@ -144,7 +145,9 @@ def fullImage():
 
         draw_img = fss.open_download_stream(ObjectId(str(data["id"])))
         # data ={"full_image":}
-        respond = json_util.dumps(draw_img.read())
+        information = "text"
+        respond = json_util.dumps(dict({"image": draw_img.read(), "information": information}))
+
         # print(respond)
 
         return respond
@@ -196,6 +199,7 @@ def add_part():
                           'Draw_img': str(draw_id),
                           'draw_id_img': str(draw_id_img),
                           'draw_id_img_preview': str(draw_id_img_preview),
+                          'information': str()
                           })
 
     path_to_model = save_to_disk(file_model, model_id, str(id_doc))
@@ -221,6 +225,7 @@ def show_db():
 @app.route('/delete', methods=['POST'])
 def delete():
     delete_id = request.json
+    delete_id = delete_id['id']
     doc = coll.find_one({'_id': ObjectId(delete_id)})
     fs.delete(doc['3d_model'])
     fs.delete(doc['Draw_img'])
