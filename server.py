@@ -118,7 +118,8 @@ def recognise_image():
                 'draw_img_preview': draw_img_preview.read(),
                 'draw_img_id': doc['draw_id_img'],
                 'Name': doc['Name'],
-                'Designation': doc['Designation'], }
+                'Designation': doc['Designation'],
+                '_id': doc['_id']}
             json_parts.append(json_part)
 
         json_data = {"predict_result": json_parts}
@@ -141,11 +142,15 @@ def fullImage():
     try:
         data = request.json
         print(data)
-        print(data["id"])
 
-        draw_img = fss.open_download_stream(ObjectId(str(data["id"])))
+        data = coll.find_one(ObjectId(str(data["PartId"]['$oid'])))
+
+        draw_img = fss.open_download_stream(ObjectId(str(data["draw_id_img"])))
         # data ={"full_image":}
-        information = "text"
+
+        information = str(data["information"])
+        print(information)
+
         respond = json_util.dumps(dict({"image": draw_img.read(), "information": information}))
 
         # print(respond)
@@ -153,6 +158,7 @@ def fullImage():
         return respond
 
     except Exception as e:
+        print("err")
         print(str(e))
 
 
@@ -192,6 +198,7 @@ def add_part():
 
     draw_id_img = upload_to_gridfs(draw_img)
     draw_id_img_preview = upload_to_gridfs(draw_img_preview)
+    information = request.files['information']
 
     id_doc = coll.insert({'Name': str(posted_data['name']),
                           'Designation': posted_data['designation'],
@@ -199,7 +206,7 @@ def add_part():
                           'Draw_img': str(draw_id),
                           'draw_id_img': str(draw_id_img),
                           'draw_id_img_preview': str(draw_id_img_preview),
-                          'information': str()
+                          'information': str(information)
                           })
 
     path_to_model = save_to_disk(file_model, model_id, str(id_doc))

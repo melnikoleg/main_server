@@ -52,10 +52,11 @@ def load_sparse_matrix():
     return z, id_parts
 
 
-vecs, id_parts = load_sparse_matrix()
+
 
 
 def load_predictor(vec):
+    vecs, id_parts = load_sparse_matrix()
     knn = NearestNeighbors(metric='cosine', algorithm='brute')
     knn.fit(vecs)
 
